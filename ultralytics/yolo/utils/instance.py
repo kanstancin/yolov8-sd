@@ -174,6 +174,7 @@ class Bboxes:
             When using boolean indexing, make sure to provide a boolean array with the same
             length as the number of bounding boxes.
         """
+        print('\n\nhere instance.py\n\n')
         if isinstance(index, int):
             return Bboxes(self.bboxes[index].view(1, -1))
         b = self.bboxes[index]

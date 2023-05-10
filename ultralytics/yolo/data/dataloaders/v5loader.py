@@ -11,6 +11,9 @@ import os
 import random
 import shutil
 import time
+
+import imgaug.augmenters as iaa
+
 from itertools import repeat
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -34,6 +37,7 @@ from ultralytics.yolo.utils.torch_utils import torch_distributed_zero_first
 
 from .v5augmentations import (Albumentations, augment_hsv, classify_albumentations, classify_transforms, copy_paste,
                               letterbox, mixup, random_perspective)
+
 
 # Parameters
 HELP_URL = 'See https://docs.ultralytics.com/yolov5/tutorials/train_custom_data'
@@ -477,6 +481,9 @@ class LoadImagesAndLabels(Dataset):
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
 
+        self.aug_blur = iaa.Sometimes(0.5, iaa.GaussianBlur(sigma=(0, 2.5)))
+        self.aug_noise = iaa.Sometimes(0.5, iaa.AdditiveGaussianNoise(loc=0,
+                                                                      scale=(0, 0.07*255), per_channel=0.5))
         try:
             f = []  # image files
             for p in path if isinstance(path, list) else [path]:
@@ -665,6 +672,7 @@ class LoadImagesAndLabels(Dataset):
         return len(self.im_files)
 
     def __getitem__(self, index):
+        print('\n\nhere gi\n\n')
         """Get a sample and its corresponding label, filename and shape from the dataset."""
         index = self.indices[index]  # linear, shuffled, or image_weights
 
@@ -704,9 +712,13 @@ class LoadImagesAndLabels(Dataset):
         nl = len(labels)  # number of labels
         if nl:
             labels[:, 1:5] = xyxy2xywhn(labels[:, 1:5], w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
-
+        import sys
+        sys.exit()
         if self.augment:
+            LOGGER.info('\n\nhere\n\n')
             # Albumentations
+            img = self.aug_blur(image=img)
+            img = self.aug_noise(image=img)
             img, labels = self.albumentations(img, labels)
             nl = len(labels)  # update after albumentations
 
@@ -1065,6 +1077,7 @@ class ClassificationDataset(torchvision.datasets.ImageFolder):
         self.samples = [list(x) + [Path(x[0]).with_suffix('.npy'), None] for x in self.samples]  # file, index, npy, im
 
     def __getitem__(self, i):
+        print('\n\nhere gi\n\n')
         """Retrieves data items of 'dataset' via indices & creates InfiniteDataLoader."""
         f, j, fn, im = self.samples[i]  # filename, index, filename.with_suffix('.npy'), image
         if self.cache_ram and im is None:

@@ -28,6 +28,7 @@ class MixAndRectDataset:
         return len(self.dataset)
 
     def __getitem__(self, index):
+        print('\n\nds_wrapper.py\n\n')
         """
         Applies mosaic, mixup and rectangular training transformations to an item in the dataset.
 
