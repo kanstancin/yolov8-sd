@@ -33,6 +33,7 @@ class DetectionTrainer(BaseTrainer):
         return build_yolo_dataset(self.args, img_path, batch, self.data, mode=mode, rect=mode == 'val', stride=gs)
 
     def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode='train'):
+        print('call')
         """TODO: manage splits differently."""
         # Calculate stride - check if model is initialized
         if self.args.v5loader:
@@ -62,6 +63,7 @@ class DetectionTrainer(BaseTrainer):
             LOGGER.warning("WARNING ⚠️ 'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
             shuffle = False
         workers = self.args.workers if mode == 'train' else self.args.workers * 2
+        print('f')
         return build_dataloader(dataset, batch_size, workers, shuffle, rank)  # return dataloader
 
     def preprocess_batch(self, batch):

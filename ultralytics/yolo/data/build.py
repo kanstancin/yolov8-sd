@@ -97,6 +97,7 @@ def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1):
     sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + RANK)
+    print('d')
     return InfiniteDataLoader(dataset=dataset,
                               batch_size=batch,
                               shuffle=shuffle and sampler is None,
