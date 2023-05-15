@@ -365,6 +365,7 @@ class BaseTrainer:
 
                 if self.args.val or final_epoch:
                     self.metrics, self.fitness, self.val_cl_map = self.validate()
+                    print(f'Validation cl_map score: {self.val_cl_map}')
 
                     if self.val_cl_map > self.best_clmap:
                         self.best_clmap = self.val_cl_map
