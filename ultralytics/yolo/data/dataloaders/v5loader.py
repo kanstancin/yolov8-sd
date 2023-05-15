@@ -672,7 +672,6 @@ class LoadImagesAndLabels(Dataset):
         return len(self.im_files)
 
     def __getitem__(self, index):
-        print('\n\nhere gi\n\n')
         """Get a sample and its corresponding label, filename and shape from the dataset."""
         index = self.indices[index]  # linear, shuffled, or image_weights
 
@@ -712,10 +711,7 @@ class LoadImagesAndLabels(Dataset):
         nl = len(labels)  # number of labels
         if nl:
             labels[:, 1:5] = xyxy2xywhn(labels[:, 1:5], w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
-        import sys
-        sys.exit()
         if self.augment:
-            LOGGER.info('\n\nhere\n\n')
             # Albumentations
             img = self.aug_blur(image=img)
             img = self.aug_noise(image=img)
@@ -1077,7 +1073,6 @@ class ClassificationDataset(torchvision.datasets.ImageFolder):
         self.samples = [list(x) + [Path(x[0]).with_suffix('.npy'), None] for x in self.samples]  # file, index, npy, im
 
     def __getitem__(self, i):
-        print('\n\nhere gi\n\n')
         """Retrieves data items of 'dataset' via indices & creates InfiniteDataLoader."""
         f, j, fn, im = self.samples[i]  # filename, index, filename.with_suffix('.npy'), image
         if self.cache_ram and im is None:

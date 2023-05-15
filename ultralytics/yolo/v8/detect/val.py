@@ -16,6 +16,16 @@ from ultralytics.yolo.utils.plotting import output_to_target, plot_images
 from ultralytics.yolo.utils.torch_utils import de_parallel
 
 
+def get_predsc_gtclass(pred, labels):
+    pred_score, gt_class = 0, 0
+    nl, npr = labels.shape[0], pred.shape[0]  # number of labels, predictions
+    if npr != 0:
+        pred_score = float(torch.max(pred[:, 4]))
+    if nl != 0:
+        gt_class = 1
+    return pred_score, gt_class
+
+
 class DetectionValidator(BaseValidator):
 
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
@@ -73,6 +83,7 @@ class DetectionValidator(BaseValidator):
 
     def update_metrics(self, preds, batch):
         """Metrics."""
+        pred_scores, gt_classes = [], []
         for si, pred in enumerate(preds):
             idx = batch['batch_idx'] == si
             cls = batch['cls'][idx]
@@ -96,6 +107,9 @@ class DetectionValidator(BaseValidator):
             ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
                             ratio_pad=batch['ratio_pad'][si])  # native-space pred
 
+            pred_score, gt_class = get_predsc_gtclass(pred, cls)  # cls is labels;
+            pred_scores.append(pred_score)
+            gt_classes.append(gt_class)
             # Evaluate
             if nl:
                 height, width = batch['img'].shape[2:]
@@ -116,6 +130,7 @@ class DetectionValidator(BaseValidator):
             if self.args.save_txt:
                 file = self.save_dir / 'labels' / f'{Path(batch["im_file"][si]).stem}.txt'
                 self.save_one_txt(predn, self.args.save_conf, shape, file)
+        return pred_scores, gt_classes
 
     def finalize_metrics(self, *args, **kwargs):
         """Set final values for metrics speed and confusion matrix."""

@@ -19,6 +19,9 @@ def on_pretrain_routine_start(trainer):
 def on_fit_epoch_end(trainer):
     """Logs training metrics and model information at the end of an epoch."""
     wb.run.log(trainer.metrics, step=trainer.epoch + 1)
+    cl_map_log = {'map_cl': trainer.val_cl_map}
+    wb.run.log(cl_map_log, step=trainer.epoch + 1)
+
     if trainer.epoch == 0:
         model_info = {
             'model/parameters': get_num_params(trainer.model),

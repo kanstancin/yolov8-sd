@@ -32,7 +32,7 @@ from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.files import increment_path
 from ultralytics.yolo.utils.ops import Profile
 from ultralytics.yolo.utils.torch_utils import de_parallel, select_device, smart_inference_mode
-
+from sklearn.metrics import average_precision_score
 
 class BaseValidator:
     """
@@ -146,6 +146,7 @@ class BaseValidator:
         bar = tqdm(self.dataloader, desc, n_batches, bar_format=TQDM_BAR_FORMAT)
         self.init_metrics(de_parallel(model))
         self.jdict = []  # empty before each val
+        pred_scores_val_set, gt_classes_val_set = [], []
         for batch_i, batch in enumerate(bar):
             self.run_callbacks('on_val_batch_start')
             self.batch_i = batch_i
@@ -166,12 +167,19 @@ class BaseValidator:
             with dt[3]:
                 preds = self.postprocess(preds)
 
-            self.update_metrics(preds, batch)
+            pred_scores_batch, gt_classes_batch = self.update_metrics(preds, batch)
+            pred_scores_val_set += pred_scores_batch
+            gt_classes_val_set += gt_classes_batch
+
             if self.args.plots and batch_i < 3:
                 self.plot_val_samples(batch, batch_i)
                 self.plot_predictions(batch, preds, batch_i)
 
             self.run_callbacks('on_val_batch_end')
+
+        # Compute classification mAP score
+        cl_map = average_precision_score(gt_classes_val_set, pred_scores_val_set)
+
         stats = self.get_stats()
         self.check_stats(stats)
         self.speed = dict(zip(self.speed.keys(), (x.t / len(self.dataloader.dataset) * 1E3 for x in dt)))
@@ -181,7 +189,7 @@ class BaseValidator:
         if self.training:
             model.float()
             results = {**stats, **trainer.label_loss_items(self.loss.cpu() / len(self.dataloader), prefix='val')}
-            return {k: round(float(v), 5) for k, v in results.items()}  # return results as 5 decimal place floats
+            return {k: round(float(v), 5) for k, v in results.items()}, cl_map  # return results as 5 decimal place floats
         else:
             LOGGER.info('Speed: %.1fms preprocess, %.1fms inference, %.1fms loss, %.1fms postprocess per image' %
                         tuple(self.speed.values()))
@@ -192,7 +200,7 @@ class BaseValidator:
                 stats = self.eval_json(stats)  # update stats
             if self.args.plots or self.args.save_json:
                 LOGGER.info(f"Results saved to {colorstr('bold', self.save_dir)}")
-            return stats
+            return stats, cl_map
 
     def add_callback(self, event: str, callback):
         """Appends the given callback."""

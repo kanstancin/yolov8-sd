@@ -134,6 +134,8 @@ class BaseTrainer:
 
         # Epoch level metrics
         self.best_fitness = None
+        self.best_clmap = 0.0
+        self.val_cl_map = 0.0
         self.fitness = None
         self.loss = None
         self.tloss = None
@@ -165,7 +167,6 @@ class BaseTrainer:
 
     def train(self):
         """Allow device='', device=None on Multi-GPU systems to default to device=0."""
-        print('\n\nhere trainer. py\n\n')
         if isinstance(self.args.device, int) or self.args.device:  # i.e. device=0 or device=[0,1,2,3]
             world_size = torch.cuda.device_count()
         elif torch.cuda.is_available():  # i.e. device=None or device=''
@@ -249,6 +250,7 @@ class BaseTrainer:
         # Dataloaders
         batch_size = self.batch_size // world_size if world_size > 1 else self.batch_size
         self.train_loader = self.get_dataloader(self.trainset, batch_size=batch_size, rank=RANK, mode='train')
+
         if RANK in (-1, 0):
             self.test_loader = self.get_dataloader(self.testset, batch_size=batch_size * 2, rank=-1, mode='val')
             self.validator = self.get_validator()
@@ -362,7 +364,13 @@ class BaseTrainer:
                 final_epoch = (epoch + 1 == self.epochs) or self.stopper.possible_stop
 
                 if self.args.val or final_epoch:
-                    self.metrics, self.fitness = self.validate()
+                    self.metrics, self.fitness, self.val_cl_map = self.validate()
+
+                    if self.val_cl_map > self.best_clmap:
+                        self.best_clmap = self.val_cl_map
+                        if self.best_clmap == self.val_cl_map:
+                            torch.save(self.get_checkpoint(), self.wdir / f"best_clmap_{self.val_cl_map:.3f}_e{epoch}.pt")
+
                 self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
                 self.stop = self.stopper(epoch + 1, self.fitness)
 
@@ -397,8 +405,7 @@ class BaseTrainer:
         torch.cuda.empty_cache()
         self.run_callbacks('teardown')
 
-    def save_model(self):
-        """Save model checkpoints based on various conditions."""
+    def get_checkpoint(self):
         ckpt = {
             'epoch': self.epoch,
             'best_fitness': self.best_fitness,
@@ -409,6 +416,11 @@ class BaseTrainer:
             'train_args': vars(self.args),  # save as dict
             'date': datetime.now().isoformat(),
             'version': __version__}
+        return ckpt
+
+    def save_model(self):
+        """Save model checkpoints based on various conditions."""
+        ckpt = self.get_checkpoint()
 
         # Save last, best and delete
         torch.save(ckpt, self.last)
@@ -462,11 +474,11 @@ class BaseTrainer:
         """
         Runs validation on test set using self.validator. The returned dict is expected to contain "fitness" key.
         """
-        metrics = self.validator(self)
+        metrics, cl_map = self.validator(self)
         fitness = metrics.pop('fitness', -self.loss.detach().cpu().numpy())  # use loss as fitness measure if not found
         if not self.best_fitness or self.best_fitness < fitness:
             self.best_fitness = fitness
-        return metrics, fitness
+        return metrics, fitness, cl_map
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         """Get model and raise NotImplementedError for loading cfg files."""
